@@ -8,8 +8,8 @@
 HX711 loadcell;
 
 // 1. HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 36;
-const int LOADCELL_SCK_PIN = 39;
+const int LOADCELL_DOUT_PIN = 33;
+const int LOADCELL_SCK_PIN = 32;
 
 
 const bool SERIAL_ = true;
@@ -76,7 +76,7 @@ void setup() {
     
     Serial.print("2. Platziere ein ");
     Serial.print(CALIBRATING_WEIGHT);
-    Serial.println("g Gewicht auf der Waage und druecke switch");
+    Serial.println("g Gewicht auf der Waage und druecke Knopf oder Enter");
     while (!userConfirmation())
       delay(10);
     
@@ -100,7 +100,7 @@ void setup() {
   Serial.println(offset, 8);  
   Serial.print("Skalierung: ");
   Serial.println(scale, 8);
-  Serial.println("Switch druecken um Messung zu beginnen.");  
+  Serial.println("Knopf oder Enter druecken um Messung zu beginnen.");  
   
 }
 
@@ -109,7 +109,7 @@ void loop() {
   float measurement = loadcell.get_units(32);
   Serial.print("Gewicht (in g): ");
   Serial.println(measurement, 4);
-  Serial.println("Druecke switch um erneut zu messen"); 
+  Serial.println("Druecke Knopf oder Enter um erneut zu messen"); 
   while (!userConfirmation())
       delay(10);
   delay(1000);

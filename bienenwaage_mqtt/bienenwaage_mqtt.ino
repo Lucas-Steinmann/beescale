@@ -1,11 +1,8 @@
 #include "HX711.h"
-#include <SenseBoxMCU.h>
 #include <SPI.h>
-#include <Wire.h>
 #include <stdarg.h>
-#include <WiFi101.h>
+#include <WiFi.h>
 #include <MQTT.h>
-#include "dualprint.h"
 
 // Configuration
 
@@ -14,30 +11,20 @@ const char pass[] = "";
 const char broker_url[] = "";
 const char* topic = "";
 
-// Toggle serial or OLED printing
-const bool SERIAL_ = true;
-const bool DISPLAY_ = false;
 
 // HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 2;
-const int LOADCELL_SCK_PIN = 1;
+const int LOADCELL_DOUT_PIN = 33;
+const int LOADCELL_SCK_PIN = 32;
 
 // Scale and offset of the scale. Must be determined with the calibration script.
-const float scale = 0.03643585;
-const float offset = 179904.0;
+const float scale = 0.03623254;
+const float offset = 178529.0;
 
 // Number of samples to take and average over before sending the result
 const int samples = 32;
 
-// Time interval between to measurements in ms
-const long interval = 9000;
-// Whether to accept button presses, to immediatly run next measurements
-const bool accept_button = false;
-
-
-// Enable to sanity check if MQTT message can be subscribed and is correctly returned.
-const bool loopback_mqtt = true;
-
+// Time interval between to measurements in us
+const uint64_t interval = 15 * 60 * 1000 * 1000;
 
 // Program State
 
@@ -45,18 +32,13 @@ IPAddress ip;
 WiFiClient wifi;
 MQTTClient client;
 HX711 loadcell;
-// Helper class to print to serial and OLED at the same time.
-DualPrint printer(SERIAL_, DISPLAY_);
-Button menuButton(0);
 
-unsigned long lastMillis = 0;
 bool printed_button_message = false;
 
 
-
-
 void setup_scale() {
-  printer.println("Initialisiere Waage.");
+  Serial.println("Initialisiere Waage.");
+  loadcell.power_up();
   loadcell.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   //loadcell.tare();
   loadcell.set_offset(offset);
@@ -64,51 +46,36 @@ void setup_scale() {
 }
 
 
-void messageReceived(String &topic, String &payload) {
-  printer.println("Nachricht erhalten: " + topic + " - " + payload);
-
-  // Note: Do not use the client in the callback to publish, subscribe or
-  // unsubscribe as it may cause deadlocks when other things arrive while
-  // sending and receiving acknowledgments. Instead, change a global variable,
-  // or push to a queue and handle it in the loop after calling `client.loop()`.
-}
-
-
-void connect() {
-  senseBoxIO.powerXB1(true);  // power on
-  
-  printer.println("Teste WiFi-Schild.");
-  if(WiFi.status() == WL_NO_SHIELD)
-  {
-    printer.println("WiFi-Schild konnte nicht gefunden werden.");
-    WiFi.end();
-    return; // don't continue
-  }
-  printer.println("Schild gefunden.");
-  
+bool connect(uint64_t timeout_millis) {  
+  uint64_t startConnect = millis();
   // connect to WiFi network
-  printer.print("Teste WiFi. ");
+  Serial.print("Verbinde mit WiFi. ");
   WiFi.begin(ssid, pass);
   while(WiFi.status() != WL_CONNECTED)
   {
-    printer.print(".");
+    Serial.print(".");
+    if (millis() - startConnect > timeout_millis) {
+      return false;
+    }
     delay(500);
   }
   
   ip = WiFi.localIP();
-  printer.print(" -> IP: ");
-  printer.println(ip);
+  Serial.print(" -> IP: ");
+  Serial.println(ip);
   
   client.begin(broker_url, wifi);
   
-  printer.print("Verbinde mit MQTT...");
+  Serial.print("Verbinde mit MQTT...");
   while (!client.connect("arduino", "try", "try")) {
-    printer.print(".");
+    Serial.print(".");
+    if (millis() - startConnect > timeout_millis) {
+      return false;
+    }
+    delay(500);
   }
-  printer.println();
-  if (loopback_mqtt) {
-    client.subscribe(topic);
-  }
+  Serial.println();
+  return true;
 }
 
 void disconnect() {
@@ -116,68 +83,45 @@ void disconnect() {
   if (WiFi.status() == WL_CONNECTED) {
     WiFi.disconnect();
   }
-  senseBoxIO.powerXB1(false);
+}
+
+void deepsleep(uint64_t sleep_time) {
+  disconnect();
+  esp_sleep_enable_timer_wakeup(sleep_time);
+  Serial.print("Gehe fuer ");
+  Serial.print(sleep_time / 1000000.0);
+  Serial.println("s schlafen.");
+  //Serial.flush(); 
+  loadcell.power_down();             // put the ADC in sleep mode
+  esp_deep_sleep_start();
 }
 
 void setup() {
-  if (accept_button) {
-    menuButton.begin();  
-  }
-  printer.init();
-  // XBEE1 Socket
-  senseBoxIO.powerXB1(false); // power off to reset
+  // Measure time before measuring to get a more accurate sleep interval.
+  uint64_t lastMillis = millis();
+  Serial.begin(115200);
   delay(250);
+  
   // Try connect to see if connection is possible
-  connect();
-
-  client.onMessage(messageReceived);
-
-
+  if (not connect(60 * 1000)) {
+    // If connection was not succesfull,
+    // go to sleep again and try later instead of wasting energy
+    deepsleep(interval - (millis() - lastMillis) * 1000);
+  }
   setup_scale();
-  printer.println("setup() abgeschlossen.");
-  lastMillis = -interval;
+  
+  Serial.println("Messe Gewicht.");
+  float measurement = loadcell.get_units(samples);
+  Serial.print("Gewicht (in g): ");
+  Serial.println(measurement, 4);
+  // Send to MQTT
+  client.publish(topic, String(measurement));
+  
+  // Sleep for the rest of the interval
+  uint64_t sleep_time = interval - (millis() - lastMillis) * 1000;
+  deepsleep(sleep_time);
 }
 
 
 void loop() {
-  
-  if (accept_button && !printed_button_message) {
-    printed_button_message = true;
-    printer.println("Druecke switch um erneut zu messen");
-  }
-
-  // Make a measurment if the time difference exceeds interval or button is active and pressed
-  if (millis() - lastMillis > interval || (accept_button and menuButton.isPressed() == HIGH)) {
-    lastMillis = millis();
-    printed_button_message = false;
-    
-    printer.clear_display();
-    printer.println("Messe Gewicht.");
-    float measurement = loadcell.get_units(samples);
-    printer.print("Gewicht (in g): ");
-    printer.println(measurement, 4);
-    // Connect if not already connected
-    if (!client.connected()) {
-      connect();
-    }
-    // Send to MQTT
-    client.publish(topic, String(measurement));
-    // allow client to receive messages
-    client.loop();
-  }
-  // Sleep for the rest of the interval button is disabled
-  if (!accept_button) {
-    long sleep_time = interval - (millis() - lastMillis);
-    printer.clear_display();
-    if (sleep_time <= 0) {
-      printer.print("Warnung: Messinterval ist kleiner als benoetigte Zeit.");
-    }
-    else {
-      disconnect();
-      printer.print("Gehe fuer ");
-      printer.print(sleep_time / 1000.0);
-      printer.println("s schlafen.");
-      delay(sleep_time);
-    }
-  }
 }
