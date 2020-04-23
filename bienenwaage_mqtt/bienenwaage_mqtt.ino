@@ -1,16 +1,18 @@
-#include "HX711.h"
+#include <HX711.h>
 #include <SPI.h>
 #include <stdarg.h>
 #include <WiFi.h>
 #include <MQTT.h>
 
+#include "config.h"
+
 // Configuration
 
-const char ssid[] = "";
-const char pass[] = "";
-const char broker_url[] = "";
-const char* topic = "";
-
+// Network
+const char ssid[] = WIFI_SSID;
+const char pass[] = WIFI_PASS;
+const char broker_url[] = MQTT_BROKER_URL;
+const char* topic = MQTT_TOPIC;
 
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 33;
@@ -33,14 +35,14 @@ WiFiClient wifi;
 MQTTClient client;
 HX711 loadcell;
 
-bool printed_button_message = false;
-
 
 void setup_scale() {
   Serial.println("Initialisiere Waage.");
   loadcell.power_up();
   loadcell.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  //loadcell.tare();
+  // Do not tare, since the weight of the beehive 
+  // is already on the scale during start up.
+  // loadcell.tare();
   loadcell.set_offset(offset);
   loadcell.set_scale(1/scale);  
 }
