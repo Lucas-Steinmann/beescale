@@ -8,15 +8,17 @@
 HX711 loadcell;
 
 // 1. HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 33;
-const int LOADCELL_SCK_PIN = 32;
+const int LOADCELL_DOUT_PIN = D7;
+const int LOADCELL_SCK_PIN = D8;
+
+const int MOSFET_PIN = D2;
 
 
 const bool SERIAL_ = true;
 const bool DISPLAY_ = false;
 
 
-int CALIBRATING_WEIGHT = 2000;
+int CALIBRATING_WEIGHT = 5000;
 
 float scale = 0;
 float offset = 0;
@@ -59,6 +61,10 @@ void setup() {
   rtc_clk_cpu_freq_set(RTC_CPU_FREQ_80M);
   delay(1000);
   Serial.println("Initialisiere Waage.");
+  
+  pinMode(MOSFET_PIN, OUTPUT);
+  digitalWrite(MOSFET_PIN, HIGH);
+  delay(500);
   
   loadcell.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   loadcell.tare();
