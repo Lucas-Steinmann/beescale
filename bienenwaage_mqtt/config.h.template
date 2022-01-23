@@ -1,4 +1,53 @@
+
+// Network configuration
 #define WIFI_SSID "Your SSID"
 #define WIFI_PASS "Your WiFi password"
 #define MQTT_BROKER_URL "URL to the MQTT broker"
-#define MQTT_TOPIC "MQTT topic to push the weight"
+#define MQTT_TOPIC_BASE "MQTT base-topic to push the all measurements"
+#define MQTT_TOPIC_WEIGHT MQTT_TOPIC_BASE"/weight"
+#define MQTT_TOPIC_RAINDROP MQTT_TOPIC_BASE"/rain"
+#define MQTT_TOPIC_BATTERY MQTT_TOPIC_BASE"/bat"
+#define MQTT_TOPIC_TEMP MQTT_TOPIC_BASE"/temperature"
+
+// Output configuration
+// Use webserial library (useful to debug, when 3,3V battery is connected, 
+// since 5V USB serial would maybe interfere with results)
+//#define TOWEBSERIAL 0
+// Print to regular Serial
+#define TOSERIAL 1
+// Print SD for logging. If defined, logging will be activated
+#define LOGFILE "/log.txt"
+// Store raw measurement values into this file.
+#define CSVFILE "/records.txt"
+
+
+// Pin Configuration
+
+// HX711 circuit wiring
+const int LOADCELL_DOUT_PIN_1 = 32;
+const int LOADCELL_SCK_PIN_1 = 33;
+const int LOADCELL_DOUT_PIN_2 = 34;
+const int LOADCELL_SCK_PIN_2 = 35;
+
+
+// Define CS pin for the SD card module
+#define SD_CS 5
+
+// Power switch for sensors
+const int SENSOR_SWITCH_PIN = -1; // Set to -1 if no switch is used to turn on sensors
+
+// Voltage measurement pin
+const int BATTERY_VOLTAGE_PIN = -1; // Set to -1 if battery voltage is not available
+
+const int RAINDROP_DOUT_PIN = -1; // Set to -1 if rain drop sensor is not available
+const int ONE_WIRE_BUS = -1; // Set to -1 if temperature sensor is not available
+
+
+// Other connfiguration
+
+
+// Time interval between to measurements in us
+const uint64_t interval = 30 * 60 * 1000 * 1000;
+
+// Number of weight samples to take and average over before sending the result
+const int samples = 1;
