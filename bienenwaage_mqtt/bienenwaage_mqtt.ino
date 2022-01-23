@@ -6,6 +6,9 @@
 // Temperature
 #include <OneWire.h>
 #include <DallasTemperature.h>
+// Time
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 // Libraries for SD card
 #include "FS.h"
@@ -50,6 +53,10 @@ const float scale_bat_v = 0.001722332451;
 IPAddress ip;
 WiFiClient wifi;
 MQTTClient client;
+// Time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+// Sensors
 HX711 loadcell_1;
 HX711 loadcell_2;
 OneWire oneWire;
@@ -258,9 +265,20 @@ void measure_temperature() {
   }
 }
 
+void measure_time() {
+  timeClient.begin();
+  timeClient.update();
+  String log_message = "UTC Time is: " + String(timeClient.getFormattedTime());
+  multi_println(log_message);
+  unsigned long epoch_time = timeClient.getEpochTime();
+  String measurement_str = String(epoch_time);
+  add_record_to_current_csv_line(measurement_str.c_str());
+}
+
 void setup() {
   // Measure time before measuring to get a more accurate sleep interval.
   uint64_t lastMillis = millis();
+  
   
   Serial.begin(115200);
   delay(250);
@@ -287,6 +305,7 @@ void setup() {
   setup_temperature();
   setup_battery();
   
+  measure_time();
   measure_weight();
   measure_raindrop();
   measure_temperature();
