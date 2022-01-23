@@ -336,10 +336,7 @@ void loop() {
 
 void add_record_to_current_csv_line(const char *record) {
 #ifdef CSVFILE
-  // TODO: rewrite as str concat
-  Serial.println("Appending: " + String(record) + " to SD Card");
-  appendFile(SD, CSVFILE, record);
-  appendFile(SD, CSVFILE, ",");
+  appendFile(SD, CSVFILE, (String(record) + ",").c_str());
 #endif
 }
 
@@ -363,15 +360,13 @@ void writeFile(fs::FS &fs, const char * path, const char * message) {
 
 // Append data to the SD card (DON'T MODIFY THIS FUNCTION)
 void appendFile(fs::FS &fs, const char * path, const char * message) {
-//  Serial.printf("Appending to file: %s\n", path);
-
   File file = fs.open(path, FILE_APPEND);
   if(!file) {
     Serial.println("Failed to open file for appending");
     return;
   }
   if(file.print(message)) {
-    Serial.println("Message appended");
+    // Serial.println("Message appended");
   } else {
     Serial.println("Append failed");
   }
