@@ -102,6 +102,11 @@ void setup_scale() {
   loadcell_2.set_scale(1/scale_2);
 }
 
+void teardown_scale() {
+  loadcell_1.power_down();
+  loadcell_2.power_down();
+}
+
 void setup_raindrop() {
   if (RAINDROP_DOUT_PIN >= 0) {
     pinMode(RAINDROP_DOUT_PIN, INPUT);
@@ -293,7 +298,7 @@ void setup() {
     deepsleep(interval - (millis() - lastMillis) * 1000);
   }
 
-  // Power on sensors
+  // Power on sensors and give them some time to stabilize
   if (SENSOR_SWITCH_PIN >= 0) {
     pinMode(SENSOR_SWITCH_PIN, OUTPUT);
     digitalWrite(SENSOR_SWITCH_PIN, HIGH);
@@ -313,8 +318,12 @@ void setup() {
   #ifdef CSVFILE
     appendFile(SD, CSVFILE, "\n");
   #endif
+
+  teardown_scale();
   
-  digitalWrite(SENSOR_SWITCH_PIN, LOW);
+  if (SENSOR_SWITCH_PIN >= 0) {
+    digitalWrite(SENSOR_SWITCH_PIN, LOW);
+  }
   // Sleep for the rest of the interval
   uint64_t sleep_time = interval - (millis() - lastMillis) * 1000;
   deepsleep(sleep_time);
